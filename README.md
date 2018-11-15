@@ -25,3 +25,9 @@ Run main file:
 cd <project_path>
 ./bin/<bin_file>
 ```
+
+Use netcat to receive/send data to socket test (run main file before to start socket listening, you can adjust socket timeout in main file):
+
+```
+nc localhost 8888
+```
