@@ -8,6 +8,10 @@
 #include "Socket.h"
 #include "Debug.h"
 
+#include <vector>
+
+using namespace std;
+
 // Thread callback variable counter.
 static unsigned int counter = 0;
 
@@ -154,25 +158,140 @@ void socketTest()
 			Debug::print(Debug::CL_NORMAL, "New client connection...\n");
 
 			// Sending data...
-			if(sock->sendData(clientfd, (const unsigned char *) toSend.c_str(), toSend.length()))
+			if(Socket::sendData(clientfd, (const unsigned char *) toSend.c_str(), toSend.length()))
 			{
 				Debug::print(Debug::CL_NORMAL, "Data sent\n");
 			}
 
 			// Sending new line...
-			if(sock->sendData(clientfd, (const unsigned char *) "\n", 1))
+			if(Socket::sendData(clientfd, (const unsigned char *) "\n", 1))
 			{
 				Debug::print(Debug::CL_NORMAL, "Newline sent\n");
 			}
 
 			// Receiving response...
-			if(sock->receiveData(clientfd, toReceive, sizeof(toReceive), timeout_sec, true))
+			if(Socket::receiveData(clientfd, toReceive, sizeof(toReceive), timeout_sec, true))
 			{
 				Debug::print(Debug::CL_NORMAL, "Socket client response: [%s]\n", toReceive);
 			}
 
 			Debug::print(Debug::CL_NORMAL, "Closing client connection...\n");
-			sock->closeClientConnection(clientfd);
+			Socket::closeClientConnection(clientfd);
+		}
+	}
+
+	Debug::print(Debug::CL_NORMAL, "Done!\n");
+
+	delete sock;
+}
+
+// ---------------------------
+// Socket with threads test...
+// ---------------------------
+
+#define PORT_MT 9999
+
+// Socket multithreading data sctructure.
+struct socket_multithreading
+{
+	Thread *task;
+	int client_id;
+	int client_fd;
+	string toSend;
+	unsigned char toReceive[128];
+	size_t timeoutSec;
+	bool started;
+	bool finished;
+};
+
+void *task_socket_multithreading(void *arg)
+{
+	struct socket_multithreading *conn = (struct socket_multithreading *) arg;
+
+	Debug::print(Debug::CL_NORMAL, "New client connection | id [%d]...\n", conn->client_id);
+
+	// Sending data...
+	if(Socket::sendData(conn->client_fd, (const unsigned char *) conn->toSend.c_str(), conn->toSend.length()))
+	{
+		Debug::print(Debug::CL_NORMAL, "Data sent | id [%d]\n", conn->client_id);
+	}
+
+	// Sending new line...
+	if(Socket::sendData(conn->client_fd, (const unsigned char *) "\n", 1))
+	{
+		Debug::print(Debug::CL_NORMAL, "Newline sent | id [%d]\n", conn->client_id);
+	}
+
+	// Receiving response...
+	if(Socket::receiveData(conn->client_fd, conn->toReceive, sizeof(conn->toReceive), conn->timeoutSec, true))
+	{
+		Debug::print(Debug::CL_NORMAL, "Socket client response: [%s] | id [%d]\n", conn->toReceive, conn->client_id);
+	}
+
+	Debug::print(Debug::CL_NORMAL, "Closing client connection | id [%d]...\n", conn->client_id);
+	Socket::closeClientConnection(conn->client_fd);
+
+	conn->finished = true;
+
+	return NULL;
+}
+
+void socketMultiThreadingTest()
+{
+	Socket *sock;
+	int clientfd;
+	const size_t timeout_sec = 5;
+	int counter_cli_conn = 0;
+
+	// Socket multithreading connections list.
+	vector<struct socket_multithreading *> client_connections;
+
+	Debug::print(Debug::CL_NORMAL, "Starting socket multithreading tests...\n");
+
+	sock = new Socket(HOST, (uint16_t) PORT_MT);
+
+	if(sock->isOpened())
+	{
+		Debug::print(Debug::CL_NORMAL, "Start socket multithreading listening...\n");
+		while(true)
+		{
+			sock->setConnections(5);
+			clientfd = sock->listenConnections(timeout_sec);
+			if(clientfd > 0)
+			{
+				struct socket_multithreading *newConn = new (struct socket_multithreading);
+
+				newConn->task = new Thread();
+				newConn->client_id = counter_cli_conn;
+				newConn->client_fd = clientfd;
+				newConn->toSend = "Hello, I'm the socket server!";
+				newConn->toReceive[0] = '\0';
+				newConn->timeoutSec = timeout_sec;
+				newConn->started = false;
+				newConn->finished = false;
+
+				if(newConn->task->create(task_socket_multithreading, (void *) newConn))
+				{
+					Debug::print(Debug::CL_NORMAL, "New connection accepted and started!\n");
+
+					newConn->started = true;
+					client_connections.push_back(newConn);
+					counter_cli_conn++;
+				}
+			}
+
+			for(unsigned int i = 0; i < client_connections.size(); i++)
+			{
+				struct socket_multithreading *conn = client_connections[i];
+				if(conn->task && conn->started && conn->finished && !conn->task->wasCanceled())
+				{
+					conn->task->join();
+					delete conn->task;
+					delete conn;
+
+					client_connections.erase(client_connections.begin() + i);
+				}
+			}
 		}
 	}
 
@@ -185,5 +304,7 @@ int main(int argc, char *argv[])
 {
 	threadTest();
 	socketTest();
+	socketMultiThreadingTest();
+
 	return 0;
 }

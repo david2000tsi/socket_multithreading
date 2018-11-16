@@ -23,9 +23,9 @@ public:
 	void setConnections(unsigned int connections);
 	bool isOpened();
 	int listenConnections(size_t timeout);
-	bool closeClientConnection(int clientfd);
-	bool sendData(int clientfd, const unsigned char *data, size_t len);
-	bool receiveData(int clientfd, unsigned char *data, size_t len, size_t timeout, bool removeNewLineAtEnd = false);
+	static bool closeClientConnection(int clientfd);
+	static bool sendData(int clientfd, const unsigned char *data, size_t len);
+	static bool receiveData(int clientfd, unsigned char *data, size_t len, size_t timeout, bool removeNewLineAtEnd = false);
 };
 
 #endif
