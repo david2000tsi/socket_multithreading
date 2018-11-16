@@ -18,6 +18,7 @@ set(SOURCE
 	${PROJ_PATH}/src/Debug.cpp
 	${PROJ_PATH}/src/Socket.cpp
 	${PROJ_PATH}/src/Thread.cpp
+	${PROJ_PATH}/src/Mutex.cpp
 	${PROJ_PATH}/main.cpp
 )
 
