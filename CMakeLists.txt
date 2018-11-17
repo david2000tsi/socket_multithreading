@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.5)
 
-set(TARGET sockets_threads)
+set(TARGET socket_multithreading)
 
 set(PROJ_PATH ${CMAKE_SOURCE_DIR})
 
