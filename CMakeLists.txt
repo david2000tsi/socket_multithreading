@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.5)
 
-set(TARGET sockets_threads)
+set(TARGET socket_multithreading)
 
 set(PROJ_PATH ${CMAKE_SOURCE_DIR})
 
@@ -18,6 +18,7 @@ set(SOURCE
 	${PROJ_PATH}/src/Debug.cpp
 	${PROJ_PATH}/src/Socket.cpp
 	${PROJ_PATH}/src/Thread.cpp
+	${PROJ_PATH}/src/Mutex.cpp
 	${PROJ_PATH}/main.cpp
 )
 

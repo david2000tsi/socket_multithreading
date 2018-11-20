@@ -199,10 +199,15 @@ bool Socket::receiveData(int clientfd, unsigned char *data, size_t len, size_t t
 		}
 
 		ret = (int) recv(clientfd, data + received, len - received, 0);
-		if(ret == -1)
+		if(ret < 0)
 		{
 			Debug::print(Debug::CL_RED, "%s: recv error\n", __FUNCTION__);
 			return false;
+		}
+		else if(ret == 0)
+		{
+			Debug::print(Debug::CL_YELLOW, "%s: client connnection closed\n", __FUNCTION__);
+			break;
 		}
 		received += (size_t) ret;
 	}
