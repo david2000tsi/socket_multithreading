@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 
 #include "Thread.h"
 #include "Mutex.h"
@@ -300,8 +301,19 @@ void socketMultiThreadingTest()
 	delete sock;
 }
 
+void handle_signal(int signal)
+{
+	if(signal == SIGINT)
+	{
+		Debug::print(Debug::CL_NORMAL, "\nInterrupt signal received, stopping app...\n");
+		exit(1);
+	}
+}
+
 int main(int argc, char *argv[])
 {
+	signal(SIGINT, handle_signal);
+
 	threadTest();
 	socketTest();
 	socketMultiThreadingTest();
