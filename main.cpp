@@ -14,7 +14,7 @@
 using namespace std;
 
 // Thread callback variable counter.
-static unsigned int counter = 0;
+static unsigned int glbCounter = 0;
 
 // Thread callback args.
 struct thread_args
@@ -46,10 +46,10 @@ void *task(void *arg)
 
 		Mutex::lock();
 
-		if(counter <= ta->counter_limit)
+		if(glbCounter <= ta->counter_limit)
 		{
-			Debug::print((Debug::Colors) ta->font_color, "Thread id: %u -> counter %04u -> rand: %06u\n", ta->id, counter, rand_num);
-			counter++;
+			Debug::print((Debug::Colors) ta->font_color, "Thread id: %u -> counter %04u -> rand: %06u\n", ta->id, glbCounter, rand_num);
+			glbCounter++;
 		}
 		else
 		{
