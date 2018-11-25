@@ -24,3 +24,8 @@ bool Mutex::unlock()
 {
 	return (pthread_mutex_unlock(&mutex) == 0);
 }
+
+bool Mutex::destroy()
+{
+	return (pthread_mutex_destroy(&mutex) == 0);
+}

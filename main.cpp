@@ -116,6 +116,11 @@ void threadTest()
 		free(task3->getRetval());
 	}
 
+	if(!Mutex::destroy())
+	{
+		Debug::print(Debug::CL_NORMAL, "Mutex destroy error!\n");
+	}
+
 	Debug::print(Debug::CL_NORMAL, "Done!\n");
 
 	if(task1)
