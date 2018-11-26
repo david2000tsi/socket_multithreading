@@ -13,8 +13,15 @@
 
 using namespace std;
 
+// Signal finish action.
+static bool glbToFinish = false;
+
+// ---------------------------
+// Threads test...
+// ---------------------------
+
 // Thread callback variable counter.
-static unsigned int counter = 0;
+static unsigned int glbCounter = 0;
 
 // Thread callback args.
 struct thread_args
@@ -44,12 +51,18 @@ void *task(void *arg)
 		rand_num = rand_interval(100000, 900000);
 		usleep(rand_num);
 
+		if(glbToFinish)
+		{
+			Debug::print((Debug::Colors) ta->font_color, "Finish request received, stopping thread id %u...\n", ta->id);
+			return (void *) strdup("Finish request received, stopping and returnning from task.");
+		}
+
 		Mutex::lock();
 
-		if(counter <= ta->counter_limit)
+		if(glbCounter <= ta->counter_limit)
 		{
-			Debug::print((Debug::Colors) ta->font_color, "Thread id: %u -> counter %04u -> rand: %06u\n", ta->id, counter, rand_num);
-			counter++;
+			Debug::print((Debug::Colors) ta->font_color, "Thread id: %u -> counter %04u -> rand: %06u\n", ta->id, glbCounter, rand_num);
+			glbCounter++;
 		}
 		else
 		{
@@ -103,17 +116,34 @@ void threadTest()
 		Debug::print(Debug::CL_NORMAL, "Thread id %u joined -> retval %s\n", ta1.id, (const char *) task1->getRetval());
 		free(task1->getRetval());
 	}
+	else
+	{
+		Debug::print(Debug::CL_NORMAL, "Thread id %u join error", ta1.id);
+	}
 
 	if(start2 && task2->join() && !task2->wasCanceled())
 	{
 		Debug::print(Debug::CL_NORMAL, "Thread id %u joined -> retval %s\n", ta2.id, (const char *) task2->getRetval());
 		free(task2->getRetval());
 	}
+	else
+	{
+		Debug::print(Debug::CL_NORMAL, "Thread id %u join error", ta2.id);
+	}
 
 	if(start3 && task3->join() && !task3->wasCanceled())
 	{
 		Debug::print(Debug::CL_NORMAL, "Thread id %u joined -> retval %s\n", ta3.id, (const char *) task3->getRetval());
 		free(task3->getRetval());
+	}
+	else
+	{
+		Debug::print(Debug::CL_NORMAL, "Thread id %u join error", ta3.id);
+	}
+
+	if(!Mutex::destroy())
+	{
+		Debug::print(Debug::CL_NORMAL, "Mutex destroy error!\n");
 	}
 
 	Debug::print(Debug::CL_NORMAL, "Done!\n");
@@ -133,6 +163,10 @@ void threadTest()
 		delete task3;
 	}
 }
+
+// ---------------------------
+// Socket test...
+// ---------------------------
 
 #define HOST "127.0.0.1"
 #define PORT 8888
@@ -254,44 +288,80 @@ void socketMultiThreadingTest()
 	if(sock->isOpened())
 	{
 		Debug::print(Debug::CL_NORMAL, "Start socket multithreading listening...\n");
+		sock->setConnections(5);
 		while(true)
 		{
-			sock->setConnections(5);
-			clientfd = sock->listenConnections(timeout_sec);
-			if(clientfd > 0)
+			// We only go to listen connections when signal is not received.
+			if(!glbToFinish)
 			{
-				struct socket_multithreading *newConn = new (struct socket_multithreading);
-
-				newConn->task = new Thread();
-				newConn->client_id = counter_cli_conn;
-				newConn->client_fd = clientfd;
-				newConn->toSend = "Hello, I'm the socket server!";
-				newConn->toReceive[0] = '\0';
-				newConn->timeoutSec = timeout_sec;
-				newConn->started = false;
-				newConn->finished = false;
-
-				if(newConn->task->create(task_socket_multithreading, (void *) newConn))
+				clientfd = sock->listenConnections(timeout_sec);
+				if(clientfd > 0)
 				{
-					Debug::print(Debug::CL_NORMAL, "New connection accepted and started!\n");
+					struct socket_multithreading *newConn = new (struct socket_multithreading);
 
-					newConn->started = true;
-					client_connections.push_back(newConn);
-					counter_cli_conn++;
+					newConn->task = new Thread();
+					newConn->client_id = counter_cli_conn;
+					newConn->client_fd = clientfd;
+					newConn->toSend = "Hello, I'm the socket server!";
+					newConn->toReceive[0] = '\0';
+					newConn->timeoutSec = timeout_sec;
+					newConn->started = false;
+					newConn->finished = false;
+
+					if(newConn->task->create(task_socket_multithreading, (void *) newConn))
+					{
+						Debug::print(Debug::CL_NORMAL, "New connection accepted and started!\n");
+
+						newConn->started = true;
+						client_connections.push_back(newConn);
+						counter_cli_conn++;
+					}
 				}
 			}
 
 			for(unsigned int i = 0; i < client_connections.size(); i++)
 			{
 				struct socket_multithreading *conn = client_connections[i];
-				if(conn->task && conn->started && conn->finished && !conn->task->wasCanceled())
-				{
-					conn->task->join();
-					delete conn->task;
-					delete conn;
+				bool toCleanMemory = false;
 
+				if(conn->task)
+				{
+					if(!glbToFinish)
+					{
+						// Only join thread when it was terminated (to not block loop).
+						if(conn->started && conn->finished && !conn->task->wasCanceled())
+						{
+							conn->task->join();
+							toCleanMemory = true;
+						}
+					}
+					else
+					{
+						// Waits for thread join (block loop until thread finish).
+						if(conn->started)
+						{
+							conn->task->join();
+							toCleanMemory = true;
+						}
+					}
+
+					if(toCleanMemory)
+					{
+						delete conn->task;
+						delete conn;
+						client_connections.erase(client_connections.begin() + i);
+					}
+				}
+				else
+				{
+					// Lets go to remove empty task from vector.
 					client_connections.erase(client_connections.begin() + i);
 				}
+			}
+
+			if(glbToFinish && client_connections.size() == 0)
+			{
+				break;
 			}
 		}
 	}
@@ -306,7 +376,7 @@ void handle_signal(int signal)
 	if(signal == SIGINT)
 	{
 		Debug::print(Debug::CL_NORMAL, "\nInterrupt signal received, stopping app...\n");
-		exit(1);
+		glbToFinish = true;
 	}
 }
 
@@ -314,9 +384,9 @@ int main(int argc, char *argv[])
 {
 	signal(SIGINT, handle_signal);
 
-	threadTest();
-	socketTest();
-	socketMultiThreadingTest();
+	if(!glbToFinish) threadTest();
+	if(!glbToFinish) socketTest();
+	if(!glbToFinish) socketMultiThreadingTest();
 
-	return 0;
+	return (int) (glbToFinish);
 }

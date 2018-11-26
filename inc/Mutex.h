@@ -15,6 +15,7 @@ public:
 	static bool init();
 	static bool lock();
 	static bool unlock();
+	static bool destroy();
 };
 
 #endif
